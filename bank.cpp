@@ -16,6 +16,7 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
 
+#include <math.h>
 #include "bank.h"
 #include "file.h"
 #include "resource.h"
@@ -24,6 +25,125 @@
 Bank::Bank(const char *dataDir)
 	: _dataDir(dataDir) {
 }
+
+bool Bank::write(const MemEntry *me, uint8_t *buf, bool packit) {
+
+	bool ret = false;
+	char bankName[10];
+  uint32_t rawsize = me->size;
+	_startRaw = buf;
+  _endRaw = buf + rawsize - 1;
+
+	sprintf(bankName, "bank%02x", me->bankId);
+	File f;
+
+	if (!f.open(bankName, _dataDir))
+		error("Bank::read() unable to open '%s'", bankName);
+
+	
+	f.seek(me->bankOffset);
+
+	if (packit) {
+	  _raw = _endRaw;
+	  _startPacked = (uint8_t*) malloc(rawsize*sizeof(uint8_t));
+    _endPacked = _startPacked + rawsize - 1;
+    _packed = _endPacked;
+    ret = pack(me->size);
+		f.write(_packed, me->packedSize);
+    free(_startPacked);
+	} else {
+		f.write(_startRaw, me->size);
+		ret = true;
+	}
+	
+	return ret;
+}
+
+void Bank::bitshift(uint8_t numBits, uint32_t data){
+  //TODO: Implement-me!
+  while (numBits){
+    shiftBuffer <<= 1;
+    shiftBuffer |= (data & 1);
+    data >>= 1;
+    numBits--;
+    countBits++;
+    if (countBits == 32){
+      _ctx.crc ^= shiftBuffer;
+      WRITE_BE_UINT32(_packed, shiftBuffer);
+      _packed -= 4;
+      shiftBuffer = 0;
+    } 
+  }
+}
+
+bool Bank::EncodeByteSequence(uint8_t minSize, uint8_t sizeBits) {
+	uint16_t count = getCode(sizeBits) + minSize;
+	debug(DBG_BANK, "Bank::decodeByteSequence(minSize=%d, sizeBits=%d) count=%d", minSize, sizeBits, count);
+	_ctx.datasize -= count;
+	while (count--) {
+		assert(_raw >= _packed && _raw >= _startBuf);
+		*_raw = (uint8_t)getCode(8);
+		--_raw;
+	}
+}
+
+bool Bank::tryCopyingPattern8bit(uint8_t offsetBits){
+  uint8_t* raw = _raw;
+  uint8_t* found = NULL;
+
+  uint8_t maxlength=4; //must have at least 5 bytes in order to have data compression
+  uint32_t maxoffset = pow(2, offsetBits);
+  uint8_t* search = MIN(_endRaw, _raw + maxoffset);
+
+  while(search > _raw){
+    uint8_t length=0;
+    uint8_t* s = search;
+    while(*s == *raw && s > _raw){
+      length++;
+      raw--;
+      s--;
+    }
+    if (length > maxlength){
+      maxlength=length;
+      found = search + length;
+    }
+    search--;
+  }
+
+  if (found){
+    //encode the pattern we've found
+    bitshift(1, 1);
+    bitshift(2, 0b11);
+    bitshift(8, maxlength);
+
+    while (maxlength){
+      bitshift(8, *found);
+      found--;
+      maxlength--;
+    }
+  }
+
+  return found != NULL;
+}
+
+bool Bank::pack(int32_t rawsize) {
+  countBits=0;
+  shiftBuffer=0;
+
+  do {
+		if (tryCopyingPattern8bit(12)) continue; //efficiency: 1,21 up to 62,06
+//		if (tryEncodingByteSequence(9, 8)) continue; //efficiency: between 1,02 and 6,54
+/*
+		if (tryCopyingPattern(4, 10)) continue; //efficiency: 2,46
+		if (tryCopyingPattern(3, 9)) continue; //efficiency: 2,00
+		if (tryCopyingPattern(2, 8)) continue; //efficiency: 1,60
+		if (tryEncodingByteSequence(1, 3)) continue; //efficiency: between 1,04 and 1,60
+*/
+
+	} while (rawsize > 0);
+  return true;
+}
+
 
 bool Bank::read(const MemEntry *me, uint8_t *buf) {
 
@@ -46,7 +166,7 @@ bool Bank::read(const MemEntry *me, uint8_t *buf) {
 	} else {
 		f.read(buf, me->packedSize);
 		_startBuf = buf;
-		_iBuf = buf + me->packedSize - 4;
+		_packed = buf + me->packedSize - 4;
 		ret = unpack();
 	}
 	
@@ -56,11 +176,11 @@ bool Bank::read(const MemEntry *me, uint8_t *buf) {
 void Bank::decodeByteSequence(uint8_t minSize, uint8_t sizeBits) {
 	uint16_t count = getCode(sizeBits) + minSize;
 	debug(DBG_BANK, "Bank::decodeByteSequence(minSize=%d, sizeBits=%d) count=%d", minSize, sizeBits, count);
-	_unpCtx.datasize -= count;
+	_ctx.datasize -= count;
 	while (count--) {
-		assert(_oBuf >= _iBuf && _oBuf >= _startBuf);
-		*_oBuf = (uint8_t)getCode(8);
-		--_oBuf;
+		assert(_raw >= _packed && _raw >= _startBuf);
+		*_raw = (uint8_t)getCode(8);
+		--_raw;
 	}
 }
 
@@ -79,11 +199,11 @@ void Bank::decodeByteSequence(uint8_t minSize, uint8_t sizeBits) {
 void Bank::CopyPattern(uint16_t count, uint8_t offsetBits) {
 	uint16_t offset = getCode(offsetBits);
 	debug(DBG_BANK, "Bank::CopyPattern(count=%d, offsetBits=%d) offset=%d", count, offsetBits, offset);
-	_unpCtx.datasize -= count;
+	_ctx.datasize -= count;
 	while (count--) {
-		assert(_oBuf >= _iBuf && _oBuf >= _startBuf);
-		*_oBuf = *(_oBuf + offset);
-		--_oBuf;
+		assert(_raw >= _packed && _raw >= _startBuf);
+		*_raw = *(_raw + offset);
+		--_raw;
 	}
 }
 
@@ -91,11 +211,11 @@ void Bank::CopyPattern(uint16_t count, uint8_t offsetBits) {
 	Most resource in the banks are compacted.
 */
 bool Bank::unpack() {
-	_unpCtx.datasize = READ_BE_UINT32(_iBuf); _iBuf -= 4;
-	_oBuf = _startBuf + _unpCtx.datasize - 1;
-	_unpCtx.crc = READ_BE_UINT32(_iBuf); _iBuf -= 4;
-	_unpCtx.chk = READ_BE_UINT32(_iBuf); _iBuf -= 4;
-	_unpCtx.crc ^= _unpCtx.chk;
+	_ctx.datasize = READ_BE_UINT32(_packed); _packed -= 4;
+	_raw = _startBuf + _ctx.datasize - 1;
+	_ctx.crc = READ_BE_UINT32(_packed); _packed -= 4;
+	_ctx.chk = READ_BE_UINT32(_packed); _packed -= 4;
+	_ctx.crc ^= _ctx.chk;
 	do {
 		if (!nextBit()) {
 			if (!nextBit()) {
@@ -157,8 +277,8 @@ bool Bank::unpack() {
           break;
       }
 		}
-	} while (_unpCtx.datasize > 0);
-	return (_unpCtx.crc == 0);
+	} while (_ctx.datasize > 0);
+	return (_ctx.crc == 0);
 }
 
 uint16_t Bank::getCode(uint8_t numBits) {
@@ -174,18 +294,18 @@ uint16_t Bank::getCode(uint8_t numBits) {
 
 bool Bank::nextBit() {
 	bool CF = rcr(false);
-	if (_unpCtx.chk == 0) {
-		assert(_iBuf >= _startBuf);
-		_unpCtx.chk = READ_BE_UINT32(_iBuf); _iBuf -= 4;
-		_unpCtx.crc ^= _unpCtx.chk;
+	if (_ctx.chk == 0) {
+		assert(_packed >= _startBuf);
+		_ctx.chk = READ_BE_UINT32(_packed); _packed -= 4;
+		_ctx.crc ^= _ctx.chk;
 		CF = rcr(true);
 	}
 	return CF;
 }
 
 bool Bank::rcr(bool CF) {
-	bool rCF = (_unpCtx.chk & 1);
-	_unpCtx.chk >>= 1;
-	if (CF) _unpCtx.chk |= 0x80000000;
+	bool rCF = (_ctx.chk & 1);
+	_ctx.chk >>= 1;
+	if (CF) _ctx.chk |= 0x80000000;
 	return rCF;
 }

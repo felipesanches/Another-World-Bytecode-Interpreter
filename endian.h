@@ -38,6 +38,13 @@ inline uint32_t READ_BE_UINT32(const void *ptr) {
 	return (b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3];
 }
 
+inline void WRITE_BE_UINT32(uint8_t *ptr, const uint32_t data) {
+  ptr[0] = (data << 24) & 255;
+  ptr[1] = (data << 16) & 255;
+  ptr[2] = (data << 8) & 255;
+  ptr[3] = data & 255;
+}
+
 #elif defined SYS_BIG_ENDIAN
 
 inline uint16_t READ_BE_UINT16(const void *ptr) {

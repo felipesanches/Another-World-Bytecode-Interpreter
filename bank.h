@@ -30,16 +30,25 @@ struct UnpackContext {
 };
 
 struct Bank {
-	UnpackContext _unpCtx;
+	UnpackContext _ctx;
 	const char *_dataDir;
-	uint8_t *_iBuf, *_oBuf, *_startBuf;
+  uint8_t *_startBuf;
+	uint8_t *_startPacked, *_endPacked, *_packed;
+	uint8_t *_startRaw, *_endRaw, *_raw; 
+  uint32_t shiftBuffer;
+  uint8_t countBits;
 
 	Bank(const char *dataDir);
 
+  bool tryCopyingPattern8bit(uint8_t offsetBits);
+  void bitshift(uint8_t numBits, uint32_t data);
+
 	bool read(const MemEntry *me, uint8_t *buf);
+  bool write(const MemEntry *me, uint8_t *buf, bool pack);
 	void decodeByteSequence(uint8_t minSize, uint8_t sizeBits);
 	void CopyPattern(uint16_t size, uint8_t offsetBits);
 	bool unpack();
+	bool pack(int32_t size);
 	uint16_t getCode(uint8_t numBits);
 	bool nextBit();
 	bool rcr(bool CF);
