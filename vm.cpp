@@ -33,6 +33,9 @@ VirtualMachine::VirtualMachine(Mixer *mix, Resource *resParameter, SfxPlayer *pl
 
 void VirtualMachine::init() {
 
+  for (int i=0; i<VM_NUM_THREADS; i++)
+    threadsData[OLD_PC_OFFSET][i] = 0xFFFF;
+
 	memset(vmVariables, 0, sizeof(vmVariables));
 	vmVariables[0x54] = 0x81;
 	vmVariables[VM_VARIABLE_RANDOM_SEED] = time(0);
@@ -119,6 +122,28 @@ void VirtualMachine::op_setSetVect() {
 	uint16_t pcOffsetRequested = _scriptPtr.fetchWord();
 	debug(DBG_VM, "VirtualMachine::op_setSetVect(0x%X, 0x%X)", threadId,pcOffsetRequested);
 	threadsData[1][threadId] = pcOffsetRequested;
+
+  print_threads_info();
+}
+
+void VirtualMachine::print_threads_info(){
+  int threads_per_line = 16;
+  for (int j=0, c=0; j< VM_NUM_THREADS / threads_per_line; j++){
+    for (int i=0; i< threads_per_line && c<VM_NUM_THREADS; i++,c++){
+      printf("%4X ", threadsData[PC_OFFSET][c]);
+    }
+    printf("\n");
+  }
+
+  threads_per_line = 8;
+  printf("Active Threads:\n");
+  for (int j=0, c=0; j< VM_NUM_THREADS / threads_per_line; j++){
+    for (int i=0; i<threads_per_line && c<VM_NUM_THREADS; i++,c++){
+      if (threadsData[PC_OFFSET][c] < 0xFFFE)
+        printf(" %d", c);
+    }
+  }
+  printf("\n\n\n");
 }
 
 void VirtualMachine::op_jnz() {
@@ -405,6 +430,30 @@ void VirtualMachine::initForPart(uint16_t partId) {
 	
 	int firstThreadId = 0;
 	threadsData[PC_OFFSET][firstThreadId] = 0;	
+}
+
+
+void VirtualMachine::FreezeChannel(int channel_selection){
+  if (threadsData[PC_OFFSET][channel_selection] < 0xFFFE){
+    threadsData[OLD_PC_OFFSET][channel_selection] = threadsData[PC_OFFSET][channel_selection];
+    threadsData[PC_OFFSET][channel_selection] = 0xFFFF;
+
+    printf("Freezing channel #%d\n", channel_selection);
+    print_threads_info();
+  } else {
+    printf("Channel #%d is already frozen.\n", channel_selection);
+  }
+}
+
+void VirtualMachine::UnFreezeChannel(int channel_selection){
+  if (threadsData[OLD_PC_OFFSET][channel_selection] <= 0xFFFE){
+    threadsData[PC_OFFSET][channel_selection] = threadsData[OLD_PC_OFFSET][channel_selection];
+
+    printf("UnFreezing channel #%d\n", channel_selection);
+    print_threads_info();
+  } else {
+    printf("Impossible to Unfreeze channel #%d!\n", channel_selection);
+  } 
 }
 
 /* 

@@ -57,7 +57,8 @@ struct Video;
 //For threadsData navigation
 #define PC_OFFSET 0
 #define REQUESTED_PC_OFFSET 1
-#define NUM_DATA_FIELDS 2
+#define OLD_PC_OFFSET 2
+#define NUM_DATA_FIELDS 3
 
 //For vmIsChannelActive navigation
 #define CURR_STATE 0
@@ -153,6 +154,9 @@ struct VirtualMachine {
 	
 	void saveOrLoad(Serializer &ser);
 	void bypassProtection();
+  void FreezeChannel(int channel_selection);
+  void UnFreezeChannel(int channel_selection);
+  void print_threads_info();
 };
 
 #endif

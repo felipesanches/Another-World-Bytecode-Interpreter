@@ -19,7 +19,10 @@
 #include <SDL.h>
 #include "sys.h"
 #include "util.h"
+#include "engine.h"
+#include "vm.h"
 
+extern Engine* e;
 
 struct SDLStub : System {
 	typedef void (SDLStub::*ScaleProc)(uint16_t *dst, uint16_t dstPitch, const uint16_t *src, uint16_t srcPitch, uint16_t w, uint16_t h);
@@ -164,6 +167,10 @@ void SDLStub::copyRect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, 
 }
 
 void SDLStub::processEvents() {
+  static int channel_selection = 0;
+  static bool freeze_input = false;
+  static bool unfreeze_input = false;
+
 	SDL_Event ev;
 	while(SDL_PollEvent(&ev)) {
 		switch (ev.type) {
@@ -242,6 +249,31 @@ void SDLStub::processEvents() {
 			case SDLK_RETURN:
 				input.button = true;
 				break;
+			case SDLK_f:
+				freeze_input = true;
+				unfreeze_input = false;
+        channel_selection=0;
+        e->vm.print_threads_info();
+        printf("Freeze: ?\n");
+				break;
+			case SDLK_u:
+				unfreeze_input = true;
+				freeze_input = false;
+        channel_selection=0;
+        e->vm.print_threads_info();
+        printf("UnFreeze: :\n");
+				break;
+			case SDLK_x:
+        if (freeze_input){
+          e->vm.FreezeChannel(channel_selection);
+          freeze_input = false;
+        }
+
+        if (unfreeze_input){
+          e->vm.UnFreezeChannel(channel_selection);
+          unfreeze_input = false;
+        }        
+				break;
 			case SDLK_c:
 				input.code = true;
 				break;
@@ -249,6 +281,14 @@ void SDLStub::processEvents() {
 				input.pause = true;
 				break;
 			default:
+        if ((freeze_input||unfreeze_input) &&
+          ev.key.keysym.sym >= SDLK_0 && ev.key.keysym.sym <= SDLK_9){
+          int v = ev.key.keysym.sym - SDLK_0;
+          channel_selection *= 10;
+          channel_selection += v;
+          e->vm.print_threads_info();
+          printf("%s: %d [press X to do it!]\n", freeze_input ? "Freeze":"UnFreeze", channel_selection);
+        }
 				break;
 			}
 			break;
