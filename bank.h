@@ -46,6 +46,7 @@ struct Bank {
 	bool read(const MemEntry *me, uint8_t *buf);
   bool write(const MemEntry *me, uint8_t *buf, bool pack);
 	void decodeByteSequence(uint8_t minSize, uint8_t sizeBits);
+  bool EncodeByteSequence(uint8_t minSize, uint8_t sizeBits);
 	void CopyPattern(uint16_t size, uint8_t offsetBits);
 	bool unpack();
 	bool pack(int32_t size);

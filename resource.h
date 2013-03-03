@@ -35,6 +35,7 @@ struct MemEntry {
 	uint8_t state;         // 0x0
 	uint8_t type;          // 0x1, Resource::ResType
 	uint8_t *bufPtr;       // 0x2
+	uint16_t unk2;         // 0x2, unused
 	uint16_t unk4;         // 0x4, unused
 	uint8_t rankNum;       // 0x6
 	uint8_t bankId;       // 0x7
@@ -93,6 +94,7 @@ struct Resource {
 	
 	void readBank(const MemEntry *me, uint8_t *dstBuf);
 	void readEntries();
+  void writeEntries();
 	void loadMarkedAsNeeded();
 	void invalidateAll();
 	void invalidateRes();	

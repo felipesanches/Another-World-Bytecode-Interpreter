@@ -62,6 +62,47 @@ int resourceSizeStats[7][2];
 int resourceUnitStats[7][2];
 
 /*
+	write all game resources metadata to memlist.bin.
+*/
+void Resource::writeEntries() {	
+	File f;
+	
+	if (!f.open("memlist.bin", _dataDir)) {
+		error("Resource::writeEntries() unable to open 'memlist.bin' file\n");
+		//Error will exit() no need to return or do anything else.
+	}
+
+  uint32_t bank_offset = 0;
+	_numMemList = 0;
+	MemEntry *me = _memList;
+	while (1) {
+		if (me->state == MEMENTRY_STATE_END_OF_MEMLIST) {
+			break;
+		}
+
+		assert(_numMemList < ARRAYSIZE(_memList));
+//		me->bufPtr = 0;
+    me->bankOffset = bank_offset;
+    bank_offset = me->bankOffset + me->packedSize;
+
+		f.writeByte(me->state);
+		f.writeByte(me->type);
+    f.writeUint16BE(me->unk2);
+		f.writeUint16BE(me->unk4);
+		f.writeByte(me->rankNum);
+		f.writeByte(me->bankId);
+		f.writeUint32BE(me->bankOffset);
+		f.writeUint16BE(me->unkC);
+		f.writeUint16BE(me->packedSize);
+		f.writeUint16BE(me->unk10);
+		f.writeUint16BE(me->size);
+
+		_numMemList++;
+		me++;
+	}
+}
+
+/*
 	Read all entries from memlist.bin. Do not load anything in memory,
 	this is just a fast way to access the data later based on their id.
 */
@@ -83,9 +124,11 @@ void Resource::readEntries() {
 	MemEntry *memEntry = _memList;
 	while (1) {
 		assert(_numMemList < ARRAYSIZE(_memList));
+		memEntry->bufPtr = 0; 
+
 		memEntry->state = f.readByte();
 		memEntry->type = f.readByte();
-		memEntry->bufPtr = 0; f.readUint16BE();
+    memEntry->unk2 = f.readUint16BE();
 		memEntry->unk4 = f.readUint16BE();
 		memEntry->rankNum = f.readByte();
 		memEntry->bankId = f.readByte();

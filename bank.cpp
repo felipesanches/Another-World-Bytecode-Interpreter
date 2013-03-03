@@ -38,8 +38,7 @@ bool Bank::write(const MemEntry *me, uint8_t *buf, bool packit) {
 	File f;
 
 	if (!f.open(bankName, _dataDir))
-		error("Bank::read() unable to open '%s'", bankName);
-
+		error("Bank::write() unable to open '%s'", bankName);
 	
 	f.seek(me->bankOffset);
 
