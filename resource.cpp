@@ -64,6 +64,7 @@ int resourceUnitStats[7][2];
 /*
 	write all game resources metadata to memlist.bin.
 */
+#define NUM_BANKS 13
 void Resource::writeEntries() {	
 	File f;
 	
@@ -72,34 +73,34 @@ void Resource::writeEntries() {
 		//Error will exit() no need to return or do anything else.
 	}
 
-  uint32_t bank_offset = 0;
-	_numMemList = 0;
-	MemEntry *me = _memList;
-	while (1) {
-		if (me->state == MEMENTRY_STATE_END_OF_MEMLIST) {
-			break;
-		}
+  uint32_t bank_offset[NUM_BANKS];
 
-		assert(_numMemList < ARRAYSIZE(_memList));
-//		me->bufPtr = 0;
-    me->bankOffset = bank_offset;
-    bank_offset = me->bankOffset + me->packedSize;
+  for (int i=0; i<NUM_BANKS; i++)
+    bank_offset[i] = 0;
 
+	MemEntry *me;
+	for (int i=0; i<_numMemList; i++) {
+		me = &_memList[i];
 		f.writeByte(me->state);
 		f.writeByte(me->type);
     f.writeUint16BE(me->unk2);
 		f.writeUint16BE(me->unk4);
 		f.writeByte(me->rankNum);
 		f.writeByte(me->bankId);
-		f.writeUint32BE(me->bankOffset);
+		f.writeUint32BE(bank_offset[me->bankId]);
 		f.writeUint16BE(me->unkC);
 		f.writeUint16BE(me->packedSize);
 		f.writeUint16BE(me->unk10);
 		f.writeUint16BE(me->size);
 
-		_numMemList++;
-		me++;
+    bank_offset[me->bankId] += me->packedSize;
 	}
+
+  //indicate in the MEMLIST.BIN file that this is the end of the memEntries list
+  for (int i=0; i<sizeof(MemEntry); i++)
+    f.writeByte(MEMENTRY_STATE_END_OF_MEMLIST);
+
+  f.close();
 }
 
 /*
