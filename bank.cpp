@@ -259,7 +259,7 @@ bool Bank::unpack() {
           //Efficiency Fórmula: 8N / 33 for N=[1 to 256]
           //Data size: N bytes
 
-          //It takes 3+8+12 = 33 bits to encode 8 bits up to 8*256 bits
+          //It takes 3+8+12 = 23 bits to encode 8 bits up to 8*256 bits
           //This is only useful for encoding a sequence of at least 5 bytes, otherwise, the resulting encoded data would take up more space than the raw data.
           break;
         case 3:
