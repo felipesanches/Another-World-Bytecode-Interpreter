@@ -34,18 +34,20 @@
 struct MemEntry {
 	uint8_t state;         // 0x0
 	uint8_t type;          // 0x1, Resource::ResType
-	uint8_t *bufPtr;       // 0x2
-	uint16_t unk2;         // 0x2, unused
-	uint16_t unk4;         // 0x4, unused
-	uint8_t rankNum;       // 0x6
-	uint8_t bankId;       // 0x7
-	uint32_t bankOffset;      // 0x8 0xA
-	uint16_t unkC;         // 0xC, unused
-	uint16_t packedSize;   // 0xE
+	uint16_t unk2;         // 0x4, unused
+	uint16_t unk4;         // 0x6, unused
+	uint8_t rankNum;       // 0x8
+	uint8_t bankId;       // 0x9
+	uint32_t bankOffset;      // 0xA 0xD
+	uint16_t unkC;         // 0xE, unused
+	uint16_t packedSize;   // 0x10 11
 	                     // All ressources are packed (for a gain of 28% according to Chahi)
 
-	uint16_t unk10;        // 0x10, unused
-	uint16_t size; // 0x12
+	uint16_t unk10;        // 0x12, unused
+	uint16_t size; // 0x14 0x15
+
+
+	uint8_t *bufPtr;       // this is not stored in MEMLIST.BIN entries
 };
 /*
      Note: state is not a boolean, it can have value 0, 1 or 2. WTF ?!
@@ -80,6 +82,7 @@ struct Resource {
 	Video *video;
 	const char *_dataDir;
 	MemEntry _memList[150];
+  uint8_t* resource_data[150];
 	uint16_t _numMemList;
 	uint16_t currentPartId, requestedNextPart;
 	uint8_t *_memPtrStart, *_scriptBakPtr, *_scriptCurPtr, *_vidBakPtr, *_vidCurPtr;
@@ -93,9 +96,14 @@ struct Resource {
 	Resource(Video *vid, const char *dataDir);
 	
 	void readBank(const MemEntry *me, uint8_t *dstBuf);
+	void writeBank(const MemEntry *me, uint8_t *srcBuf, bool packed);
 	void readEntries();
-  void writeEntries();
+  void writeEntries(bool packed);
 	void loadMarkedAsNeeded();
+  void loadAllResources();
+	void writeAllResources(bool packed);
+  void freeAllResources();
+
 	void invalidateAll();
 	void invalidateRes();	
 	void loadPartsOrMemoryEntry(uint16_t num);

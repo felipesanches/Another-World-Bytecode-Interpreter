@@ -37,7 +37,7 @@ bool Bank::write(const MemEntry *me, uint8_t *buf, bool packit) {
 	sprintf(bankName, "bank%02x", me->bankId);
 	File f;
 
-	if (!f.open(bankName, _dataDir))
+	if (!f.open(bankName, _dataDir, "wb"))
 		error("Bank::write() unable to open '%s'", bankName);
 	
 	f.seek(me->bankOffset);
@@ -51,6 +51,7 @@ bool Bank::write(const MemEntry *me, uint8_t *buf, bool packit) {
 		f.write(_packed, me->packedSize);
     free(_startPacked);
 	} else {
+    printf("bankId[%d] me->size: %04x\n", me->bankId, me->size);
 		f.write(_startRaw, me->size);
 		ret = true;
 	}
@@ -157,6 +158,8 @@ bool Bank::read(const MemEntry *me, uint8_t *buf) {
 	
 	f.seek(me->bankOffset);
 
+  printf("READ: bankId[%d] me->size: %04x me->packedSize: %04x\n", me->bankId, me->size, me->packedSize);
+
 	// Depending if the resource is packed or not we
 	// can read directly or unpack it.
 	if (me->packedSize == me->size) {
@@ -169,6 +172,7 @@ bool Bank::read(const MemEntry *me, uint8_t *buf) {
 		ret = unpack();
 	}
 	
+  printf("READ: bankId[%d] me->size: %04x me->packedSize: %04x\n", me->bankId, me->size, me->packedSize);
 	return ret;
 }
 
@@ -255,12 +259,12 @@ bool Bank::unpack() {
           // from a pattern previously occurring in the decoded data
 					CopyPattern(getCode(8)+1, 12); //up to 2^12 = 4kbytes far away
 
-          //Packing efficiency: 1,21 up to 62,06
-          //Efficiency Fórmula: 8N / 33 for N=[1 to 256]
+          //Packing efficiency: 0,34 (inefficient) up to 89,04
+          //Efficiency Fórmula: 8N / 23 for N=[1 to 256]
           //Data size: N bytes
 
           //It takes 3+8+12 = 23 bits to encode 8 bits up to 8*256 bits
-          //This is only useful for encoding a sequence of at least 5 bytes, otherwise, the resulting encoded data would take up more space than the raw data.
+          //This is only useful for encoding a sequence of at least 3 bytes, otherwise, the resulting encoded data would take up more space than the raw data.
           break;
         case 3:
   				decodeByteSequence(9, 8); // 9 + [8bits] == decode at least 9 bytes / 

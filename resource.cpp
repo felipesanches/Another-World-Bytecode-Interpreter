@@ -36,7 +36,16 @@ void Resource::readBank(const MemEntry *me, uint8_t *dstBuf) {
 	if (!bk.read(me, dstBuf)) {
 		error("Resource::readBank() unable to unpack entry %d\n", n);
 	}
+}
 
+void Resource::writeBank(const MemEntry *me, uint8_t *srcBuf, bool packed) {
+	uint16_t n = me - _memList;
+	debug(DBG_BANK, "Resource::writeBank(%d)", n);
+
+	Bank bk(_dataDir);
+	if (!bk.write(me, srcBuf, packed)) {
+		error("Resource::writeBank() unable to deal with entry %d\n", n);
+	}
 }
 
 static const char *resTypeToString(unsigned int type)
@@ -65,10 +74,12 @@ int resourceUnitStats[7][2];
 	write all game resources metadata to memlist.bin.
 */
 #define NUM_BANKS 13
-void Resource::writeEntries() {	
+void Resource::writeEntries(bool packed) {	
+  printf("writeEntries: [start]\n");
+
 	File f;
 	
-	if (!f.open("memlist.bin", _dataDir)) {
+	if (!f.open("memlist.bin", _dataDir, "wb")) {
 		error("Resource::writeEntries() unable to open 'memlist.bin' file\n");
 		//Error will exit() no need to return or do anything else.
 	}
@@ -81,26 +92,61 @@ void Resource::writeEntries() {
 	MemEntry *me;
 	for (int i=0; i<_numMemList; i++) {
 		me = &_memList[i];
+
+    me->bankOffset = bank_offset[me->bankId-1];
+    if (!packed){
+      me->packedSize = me->size;
+    }
+
 		f.writeByte(me->state);
 		f.writeByte(me->type);
     f.writeUint16BE(me->unk2);
 		f.writeUint16BE(me->unk4);
 		f.writeByte(me->rankNum);
 		f.writeByte(me->bankId);
-		f.writeUint32BE(bank_offset[me->bankId]);
+		f.writeUint32BE(me->bankOffset);
 		f.writeUint16BE(me->unkC);
 		f.writeUint16BE(me->packedSize);
 		f.writeUint16BE(me->unk10);
 		f.writeUint16BE(me->size);
 
-    bank_offset[me->bankId] += me->packedSize;
+    bank_offset[me->bankId-1] += me->packedSize;
 	}
 
   //indicate in the MEMLIST.BIN file that this is the end of the memEntries list
-  for (int i=0; i<sizeof(MemEntry); i++)
+  for (unsigned int i=0; i<20; i++)
     f.writeByte(MEMENTRY_STATE_END_OF_MEMLIST);
 
   f.close();
+  printf("writeEntries: [done]\n");
+}
+
+void Resource::loadAllResources(){
+	MemEntry *me;
+	for (int i=0; i<_numMemList; i++) {
+		me = &_memList[i];
+    resource_data[i] = (uint8_t*) malloc(me->size * sizeof(uint8_t));
+		readBank(me, resource_data[i]);
+  }
+}
+
+void Resource::freeAllResources(){
+	for (int i=0; i<_numMemList; i++) {
+    free(resource_data[i]);
+  }
+}
+
+void Resource::writeAllResources(bool packed){
+  printf("writeAllResources: [start]\n");
+
+	MemEntry *me;
+	for (int i=0; i<_numMemList; i++) {
+		me = &_memList[i];
+    printf("writing %d bytes to resource #%d\n", me->size, i);
+    writeBank(me, resource_data[i], packed);
+  }
+
+  printf("writeAllResources: [done]\n");
 }
 
 /*

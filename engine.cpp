@@ -51,8 +51,8 @@ Engine::~Engine(){
 
 
 void Engine::init() {
+	bool regenerate_unpacked_resource_files = true;
 
-	
 	//Init system
 	sys->init("Out Of This World");
 
@@ -61,6 +61,15 @@ void Engine::init() {
 	res.allocMemBlock();
 
 	res.readEntries();
+
+  if (regenerate_unpacked_resource_files){
+    bool packed = false;
+    res.loadAllResources();
+	  res.writeEntries(packed);
+	  res.writeAllResources(packed);
+    res.freeAllResources();
+    exit(0);
+  }
 
 	vm.init();
 
